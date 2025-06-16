@@ -1,0 +1,37 @@
+name: Test Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      
+      - name: Build With Gradle
+        run: |
+          chmod +x gradlew
+          # 修正任务名大小写 + 添加 --no-daemon 避免进程冲突
+          ./gradlew assembleRelease --build-cache --parallel --no-daemon --warning-mode all
+      
+      - name: Find and Upload APK
+        run: |
+          # 在项目目录下查找APK文件
+          apk_path=$(find . -path '*/outputs/apk/*release/*.apk' | head -1)
+          if [ -f "$apk_path" ]; then
+            echo "APK found: $apk_path"
+            # 直接上传目标文件
+            echo "apk_file=$apk_path" >> $GITHUB_ENV
+          else
+            echo "::error::APK file not found!"
+            exit 1
+          fi
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-apk
+          path: ${{ env.apk_file }}
