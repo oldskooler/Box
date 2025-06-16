@@ -11,13 +11,9 @@ android {
         targetSdkVersion 28
 
         python {
-            // 只在 Windows 本地使用指定路径
-            if (System.properties['os.name'].toLowerCase().contains("windows")) {
                 buildPython "D:/Programs/Python/Python38/python.exe"
-            }
+               }
             pip {
-                install "six"
-                install "urllib3"
                 install "lxml"
                 install "ujson"
                 install "pyquery"
