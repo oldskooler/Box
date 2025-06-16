@@ -1,4 +1,4 @@
-name: Test Build 2025
+name: Test Build
 
 on:
   workflow_dispatch:
@@ -23,13 +23,14 @@ jobs:
         with:
           python-version: '3.8'
 
+      - name: Fix gradlew permissions
+        run: chmod +x ./gradlew
+
       - name: Clean Project
         run: ./gradlew clean
 
       - name: Build With Gradle
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleRelease --build-cache --parallel --daemon --warning-mode all
+        run: ./gradlew assembleRelease --build-cache --parallel --daemon --warning-mode all
 
       - name: Prepare APK Output
         run: |
