@@ -1,4 +1,4 @@
-name: Android CI Build
+name: Test Build 2025
 
 on:
   workflow_dispatch:
@@ -6,118 +6,38 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      ANDROID_HOME: /usr/local/lib/android/sdk
-    
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      
-      # 使用官方推荐的 Android 设置方法
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+
+      - name: Set Up JDK 11
+        uses: actions/setup-java@v3
         with:
-          java-version: 17
           distribution: temurin
-      
-      # 使用正确的 Android 安装方式
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+          java-version: 11
+
+      - name: Set Up Python
+        uses: actions/setup-python@v5
         with:
-          # 分开发送每个包（关键修复）
-          packages: platform-tools
-          packages: platforms;android-33
-          packages: build-tools;34.0.0
-          packages: cmdline-tools;latest
-      
-      # 验证 Android SDK 安装
-      - name: Verify Android tools
-        run: |
-          echo "ANDROID_HOME = $ANDROID_HOME"
-          ls -l $ANDROID_HOME
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --list_installed
-      
-      - name: Create local.properties
-        run: |
-          echo "sdk.dir=$ANDROID_HOME" > local.properties
-          echo "# NDK 配置（可选）" >> local.properties
-          # echo "ndk.dir=$ANDROID_HOME/ndk/25.2.9519653" >> local.properties
-          cat local.properties
-      
-      - name: Setup Gradle properties
-        run: |
-          # 禁用 Gradle 守护进程
-          mkdir -p ~/.gradle
-          echo "org.gradle.daemon=false" >> ~/.gradle/gradle.properties
-          echo "org.gradle.parallel=true" >> ~/.gradle/gradle.properties
-      
-      # 缓存优化
-      - name: Cache Gradle dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/gradle-wrapper.properties') }}
-      
-      - name: Prepare Gradle Wrapper
+          python-version: '3.8'
+
+      - name: Clean Project
+        run: ./gradlew clean
+
+      - name: Build With Gradle
         run: |
           chmod +x gradlew
-          ./gradlew --version
-      
-      # Gradle 构建带诊断
-      - name: Build with Gradle
+          ./gradlew assembleRelease --build-cache --parallel --daemon --warning-mode all
+
+      - name: Prepare APK Output
         run: |
-          ./gradlew assembleRelease \
-            --no-daemon \
-            --build-cache \
-            --parallel \
-            --warning-mode all \
-            --stacktrace
-        env:
-          ORG_GRADLE_PROJECT_disablePreDex: true
-      
-      # 查找 APK 文件
-      - name: Locate APK files
-        id: find_apk
-        run: |
-          # 定位所有发布版 APK
-          apk_files=$(find . -path '*/*release/*.apk')
-          echo "Found APKs:"
-          echo "$apk_files"
-          
-          # 准备上传目录
-          mkdir -p ${{ github.workspace }}/apk
-          
-          # 移动并重命名 APK
-          counter=0
-          for file in $apk_files; do
-            filename=$(basename "$file")
-            new_name="app-$(date +%Y%m%d%H%M)-$counter.apk"
-            mv "$file" "${{ github.workspace }}/apk/$new_name"
-            echo "Moved $filename to $new_name"
-            ((counter++))
-          done
-          
-          # 验证结果
-          echo "Final APK list:"
-          ls -lh ${{ github.workspace }}/apk/
-          echo "apk_dir=${{ github.workspace }}/apk" >> $GITHUB_OUTPUT
-          echo "apk_count=$counter" >> $GITHUB_OUTPUT
-      
-      # 上传结果
-      - name: Upload APK artifact
-        if: ${{ steps.find_apk.outputs.apk_count > 0 }}
+          mkdir -p ${{ github.workspace }}/apk/
+          find $HOME -type f -name "*.apk" -exec mv {} ${{ github.workspace }}/apk/ \;
+
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: release-apk
-          path: ${{ steps.find_apk.outputs.apk_dir }}/*.apk
-          retention-days: 7
-      
-      - name: Check build result
-        if: ${{ steps.find_apk.outputs.apk_count == 0 }}
-        run: |
-          echo "::error::No APK files found! Build may have failed."
-          exit 1
+          name: com.github.tvbox.osc
+          path: ${{ github.workspace }}/apk/
